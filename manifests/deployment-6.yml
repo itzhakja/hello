@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "itzhakaks-ff25"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "itzhakaks-ff25"
+  template:
+    metadata:
+      labels:
+        app: "itzhakaks-ff25"
+    spec:
+      containers:
+        - name: "itzhakaks-ff25"
+          image: "itzhakcontainerregistry.azurecr.io/itzhakaks"
+          ports:
+          - containerPort: 80
