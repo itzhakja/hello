@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: itzhakcontainerregistry.azurecr.io
+        username: ${{ secrets.acr_itzhakcontainerregistry_username }}
+        password: ${{ secrets.acr_itzhakcontainerregistry_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/" -f  "Dockerfile" -t itzhakcontainerregistry.azurecr.io/itzhakaks:${{ github.sha }} --label dockerfile-path=Dockerfile
+        docker push itzhakcontainerregistry.azurecr.io/itzhakaks:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_itzhakaks_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep itzhak-aksac79 | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace itzhak-aksac79`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: itzhak-aksac79
+        container-registry-url: itzhakcontainerregistry.azurecr.io
+        container-registry-username: ${{ secrets.acr_itzhakcontainerregistry_username }}
+        container-registry-password: ${{ secrets.acr_itzhakcontainerregistry_password }}
+        secret-name: itzhakaksdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: itzhak-aksac79
+        manifests: |
+          manifests/deployment-6.yml
+          manifests/service-6.yml
+        images: |
+          itzhakcontainerregistry.azurecr.io/itzhakaks:${{ github.sha }}
+        imagepullsecrets: |
+          itzhakaksdockerauth
